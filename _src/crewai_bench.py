@@ -5,6 +5,7 @@ import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from tokenize import Floatnumber
 from typing import List
 from crewai import Agent, Task, Crew
 
@@ -17,6 +18,8 @@ from .trip_tool import (
     TripDataNotFoundError,
     format_average_trip_duration,
 )
+
+FINAL_AGGREGATION_RESPONSE: float = 25.7
 
 
 @dataclass
@@ -32,6 +35,7 @@ class TimingBreakdown:
     total: float
     queue_wait: float
     call: float
+    status: bool
 
 
 @dataclass
@@ -49,6 +53,8 @@ class BenchmarkResult:
     p95_call_ms: float
     average_processing_ms: float
     p95_processing_ms: float
+    total_success: int
+    total_failure: int
 
     def print(self) -> None:
         print(f"--- {self.name} ---")
@@ -67,6 +73,8 @@ class BenchmarkResult:
         print(
             f"framework ovh : avg {self.average_processing_ms:.2f} ms | p95 {self.p95_processing_ms:.2f} ms"
         )
+        print(f"success count  : {self.total_success}")
+        print(f"failure count  : {self.total_failure}")
 
 
 def persist_result(result: BenchmarkResult) -> None:
@@ -145,6 +153,13 @@ def load_config() -> BenchmarkConfig:
     )
 
 
+from pydantic import BaseModel, Field
+
+
+class FloatResponse(BaseModel):
+    value: float = Field(description="The numerical result as a float")
+
+
 def build_agent(model: str, tool: BaseTool) -> Agent:
     llm = ChatOpenAI(model=model, temperature=0.2)
     return Agent(
@@ -182,7 +197,7 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
         queue_wait = dequeued - submitted
         call_started = time.perf_counter()
 
-        def kickoff() -> None:
+        def kickoff() -> bool:
             tool = TripDataAverageDurationTool()
             agent = build_agent(config.model, tool)
             task = Task(
@@ -191,13 +206,15 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
                     "to compute the average trip duration in minutes."
                 ),
                 agent=agent,
+                output_json=FloatResponse,
                 expected_output="Average trip duration summary in minutes.",
             )
             crew = Crew(agents=[agent], tasks=[task])
             result = crew.kickoff()
-            # print(result)
+            # print(result["value"])
+            return result["value"] == FINAL_AGGREGATION_RESPONSE
 
-        await asyncio.to_thread(kickoff)
+        status = await asyncio.to_thread(kickoff)
         call_duration = time.perf_counter() - call_started
         total_duration = time.perf_counter() - submitted
         breakdowns.append(
@@ -205,6 +222,7 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
                 total=total_duration,
                 queue_wait=queue_wait,
                 call=call_duration,
+                status=status,
             )
         )
 
@@ -227,6 +245,9 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
 
     throughput_rps = len(breakdowns) / max(total_duration, 1e-9)
 
+    success_count = sum(1 for b in breakdowns if b.status)
+    failure_count = len(breakdowns) - success_count
+
     return BenchmarkResult(
         name="CrewAI",
         total_requests=len(breakdowns),
@@ -241,6 +262,8 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
         p95_call_ms=percentile(call_latencies, 0.95) * 1_000.0,
         average_processing_ms=avg_processing_ms,
         p95_processing_ms=percentile(processing_latencies, 0.95) * 1_000.0,
+        total_success=success_count,
+        total_failure=failure_count,
     )
 
 

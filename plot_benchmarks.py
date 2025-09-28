@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -11,9 +12,49 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
+import yaml
 
 BENCH_RESULTS_PATH = Path(os.getenv("BENCH_RESULTS_PATH", "benchmark_results.json"))
+
+
+@dataclass
+class BenchmarkConfig:
+    total_requests: int
+    concurrency: int
+    model: str
+    prompt_template: str
+
+
+def load_config() -> BenchmarkConfig:
+    config_path = Path(os.getenv("BENCH_CONFIG", "benchmark.yaml"))
+    try:
+        raw = config_path.read_text()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Benchmark config not found at {config_path}") from exc
+
+    data = yaml.safe_load(raw)
+    if not isinstance(data, dict):
+        raise ValueError("Benchmark config must be a YAML mapping")
+
+    try:
+        total_requests = int(data["total_requests"])
+        concurrency = int(data["concurrency"])
+        model = str(data.get("model", "gpt-4o-mini"))
+        prompt_template = str(
+            data.get(
+                "prompt_template",
+                "Calculate the average trip duration in minutes using the available tool.",
+            )
+        )
+    except KeyError as exc:
+        raise ValueError(f"Missing required config key: {exc}") from exc
+
+    return BenchmarkConfig(
+        total_requests=total_requests,
+        concurrency=concurrency,
+        model=model,
+        prompt_template=prompt_template,
+    )
 
 
 def load_results(path: Path) -> pd.DataFrame:
@@ -52,7 +93,7 @@ def plot_metrics_grid(frame: pd.DataFrame, output_dir: Path) -> None:
         },
         {
             "column": "total_duration",
-            "ylabel": "Duration (ms)",
+            "ylabel": "Duration (s)",
             "title": "Total Duration (Lower is Better)",
             "palette": "Greens_d",
         },
@@ -88,8 +129,10 @@ def plot_metrics_grid(frame: pd.DataFrame, output_dir: Path) -> None:
         ax.remove()
 
     total_requests = frame["total_requests"].iloc[0]
+    config = load_config()
+    model_name = config.model
     fig.suptitle(
-        f"Benchmark Summary Model - gpt-3.5-turbo (Total Requests: {total_requests})",
+        f"Benchmark Summary Model - {model_name} (Total Requests: {total_requests})",
         fontsize=12,
     )
     fig.tight_layout(rect=(0, 0, 1, 0.95))

@@ -376,5 +376,7 @@ impl BenchmarkResult {
             "framework ovh : avg {:.2} ms | p95 {:.2} ms",
             self.average_processing_ms, self.p95_processing_ms
         );
+        println!("Total Sucess: {}", self.total_success);
+        println!("Total Failure: {}", self.total_failure);
     }
 }

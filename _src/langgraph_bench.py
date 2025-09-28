@@ -1,11 +1,14 @@
 import asyncio
 import json
 import math
+from numbers import Number
 import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import List
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import ToolNode
 from langgraph.store.base import Result
 from pydantic import BaseModel, Field
 
@@ -15,12 +18,14 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 import yaml
 
-from .result_validation import evaluate_structured_result
 from .trip_tool import (
     TripDataEmptyError,
     TripDataNotFoundError,
     format_average_trip_duration,
 )
+
+
+FINAL_AGGREGATION_RESPONSE: float = 25.7
 
 
 @dataclass
@@ -96,7 +101,7 @@ def persist_result(result: BenchmarkResult) -> None:
     output_path.write_text(json.dumps(data, indent=2, sort_keys=True))
 
 
-@tool("trip_data_average_duration", return_direct=True)
+@tool("trip_data_average_duration", return_direct=False)
 def trip_data_average_duration_tool() -> str:
     """Summarise the average TLC trip duration from the parquet dataset."""
 
@@ -126,6 +131,12 @@ class TripDurationResult(BaseModel):
     row_count: int = Field(..., description="Number of trips in dataset")
 
 
+class StructuredResponseSchema(BaseModel):
+    """Always use this tool to structure your response to the user."""
+
+    answer: float = Field(description="The Average Trip Duration in Minutes")
+
+
 async def run_langgraph_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
     if config.concurrency < 1:
         raise ValueError("concurrency must be greater than zero")
@@ -136,11 +147,13 @@ async def run_langgraph_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
         f"Preparing LangGraph benchmark: {config.total_requests} requests with concurrency {config.concurrency}"
     )
 
-    model = init_chat_model(
-        config.model,
-        model_provider="openai",
+    llm = ChatOpenAI(model=config.model)
+    agent = create_react_agent(
+        llm,
+        prompt="You are helpful assistant, Provide the answer to the user's question in structured format",
+        tools=[trip_data_average_duration_tool],
+        response_format=StructuredResponseSchema,
     )
-    agent = create_react_agent(model, tools=[trip_data_average_duration_tool])
 
     breakdowns: List[TimingBreakdown] = []
 
@@ -152,8 +165,8 @@ async def run_langgraph_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
         call_started = time.perf_counter()
         result = await agent.ainvoke({"messages": [("user", prompt)]})
 
-        # TODO: FIx
-        status, _ = evaluate_structured_result(result)
+        response = result["structured_response"]
+        status = response.answer == FINAL_AGGREGATION_RESPONSE
 
         call_duration = time.perf_counter() - call_started
         total_duration = time.perf_counter() - submitted
