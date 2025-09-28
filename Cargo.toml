@@ -1,7 +1,8 @@
 [package]
-name = "bench"
+name = "autoagents-bench"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
 anyhow = "1.0.99"
@@ -9,8 +10,11 @@ autoagents = { git = "https://github.com/liquidos-ai/AutoAgents", features = [
   "openai",
 ] }
 autoagents-derive = { git = "https://github.com/liquidos-ai/AutoAgents" }
-rig-core = { version = "0.19.0", features = ["all"] }
+futures = "0.3.31"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
+serde_yaml = "0.9.34"
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
+chrono = { version = "0.4.38", default-features = false, features = ["std"] }
+polars = {version = "0.51.0", features = ["parquet", "dtype-datetime", "lazy"] }

@@ -1,0 +1,4 @@
+total_requests: 1
+concurrency: 10 #Currently Not used
+model: gpt-4o-mini
+prompt_template: "Calculate the average trip duration in minutes using the provided tools."

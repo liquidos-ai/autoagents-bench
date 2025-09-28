@@ -1,0 +1,51 @@
+{
+  "AutoAgents": {
+    "average_call_ms": 2064.3248668,
+    "average_latency_ms": 2064.3251737999994,
+    "average_processing_ms": 0.00030700000000000004,
+    "average_queue_ms": 4.7999999999999994e-05,
+    "concurrency": 10,
+    "name": "AutoAgents",
+    "p95_call_ms": 2130.059658,
+    "p95_latency_ms": 2130.06,
+    "p95_processing_ms": 0.000551,
+    "p95_queue_ms": 5.9999999999999995e-05,
+    "throughput_rps": 2.3471321822676647,
+    "total_duration": 2.1302592320000002,
+    "total_failure": 0,
+    "total_requests": 5,
+    "total_success": 5
+  },
+  "CrewAI": {
+    "average_call_ms": 7832.3907160011,
+    "average_latency_ms": 7832.391897998605,
+    "average_processing_ms": 0.001181997504318133,
+    "average_queue_ms": 6.999835022725165e-05,
+    "concurrency": 10,
+    "name": "CrewAI",
+    "p95_call_ms": 7832.3907160011,
+    "p95_latency_ms": 7832.391897998605,
+    "p95_processing_ms": 0.001181997504318133,
+    "p95_queue_ms": 6.999835022725165e-05,
+    "throughput_rps": 0.12767397979825915,
+    "total_duration": 7.8324495060005574,
+    "total_requests": 1
+  },
+  "LangGraph": {
+    "average_call_ms": 1834.1299599997,
+    "average_latency_ms": 1834.1307420014346,
+    "average_processing_ms": 0.0007820017344783992,
+    "average_queue_ms": 0.000200001522898674,
+    "concurrency": 10,
+    "name": "LangGraph",
+    "p95_call_ms": 1834.1299599997,
+    "p95_latency_ms": 1834.1307420014346,
+    "p95_processing_ms": 0.0007820017344783992,
+    "p95_queue_ms": 0.000200001522898674,
+    "throughput_rps": 0.5452019943099358,
+    "total_duration": 1.834182579001208,
+    "total_failure": 1,
+    "total_requests": 1,
+    "total_success": 0
+  }
+}
