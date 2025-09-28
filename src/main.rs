@@ -166,6 +166,7 @@ async fn bench_autoagents(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
         .context("failed to build AutoAgents LLM client")?;
 
     let mut tasks = FuturesUnordered::new();
+    let start = Instant::now();
     for req_id in 0..config.total_requests {
         let sliding_window_memory = Box::new(SlidingWindowMemory::new(10));
         let agent_handle = AgentBuilder::<_, DirectAgent>::new(ReActAgent::new(SimpleAgent {}))
@@ -204,8 +205,6 @@ async fn bench_autoagents(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
     }
 
     let mut breakdowns = Vec::with_capacity(config.total_requests);
-
-    let start = Instant::now();
 
     while let Some(next) = tasks.next().await {
         match next {

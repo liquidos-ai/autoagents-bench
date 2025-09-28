@@ -20,6 +20,7 @@ from .trip_tool import (
 )
 
 FINAL_AGGREGATION_RESPONSE: float = 25.7
+SUCCESS_ABS_TOLERANCE: float = 0.01
 
 
 @dataclass
@@ -121,6 +122,10 @@ def percentile(data: List[float], perc: float) -> float:
     return data[rank]
 
 
+def is_successful_result(value: float) -> bool:
+    return math.isclose(value, FINAL_AGGREGATION_RESPONSE, abs_tol=SUCCESS_ABS_TOLERANCE)
+
+
 def load_config() -> BenchmarkConfig:
     config_path = Path(os.getenv("BENCH_CONFIG", "benchmark.yaml"))
     try:
@@ -211,8 +216,11 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
             )
             crew = Crew(agents=[agent], tasks=[task])
             result = crew.kickoff()
-            # print(result["value"])
-            return result["value"] == FINAL_AGGREGATION_RESPONSE
+            try:
+                value = float(result["value"])
+            except (KeyError, TypeError, ValueError):
+                return False
+            return is_successful_result(value)
 
         status = await asyncio.to_thread(kickoff)
         call_duration = time.perf_counter() - call_started
@@ -226,9 +234,8 @@ async def run_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
             )
         )
 
-    tasks = [asyncio.create_task(worker(i)) for i in range(config.total_requests)]
-
     overall_started = time.perf_counter()
+    tasks = [asyncio.create_task(worker(i)) for i in range(config.total_requests)]
     await asyncio.gather(*tasks)
     total_duration = time.perf_counter() - overall_started
 

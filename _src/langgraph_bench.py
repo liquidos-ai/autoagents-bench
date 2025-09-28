@@ -26,6 +26,7 @@ from .trip_tool import (
 
 
 FINAL_AGGREGATION_RESPONSE: float = 25.7
+SUCCESS_ABS_TOLERANCE: float = 0.01
 
 
 @dataclass
@@ -123,6 +124,10 @@ def percentile(data: List[float], perc: float) -> float:
     return data[rank]
 
 
+def is_successful_result(value: float) -> bool:
+    return math.isclose(value, FINAL_AGGREGATION_RESPONSE, abs_tol=SUCCESS_ABS_TOLERANCE)
+
+
 # 1. Define your structured output schema
 class TripDurationResult(BaseModel):
     average_trip_duration_minutes: float = Field(
@@ -165,8 +170,13 @@ async def run_langgraph_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
         call_started = time.perf_counter()
         result = await agent.ainvoke({"messages": [("user", prompt)]})
 
-        response = result["structured_response"]
-        status = response.answer == FINAL_AGGREGATION_RESPONSE
+        try:
+            response = result["structured_response"]
+            value = float(response.answer)
+        except (KeyError, TypeError, ValueError):
+            status = False
+        else:
+            status = is_successful_result(value)
 
         call_duration = time.perf_counter() - call_started
         total_duration = time.perf_counter() - submitted
@@ -179,9 +189,8 @@ async def run_langgraph_benchmark(config: BenchmarkConfig) -> BenchmarkResult:
             )
         )
 
-    tasks = [asyncio.create_task(worker(i)) for i in range(config.total_requests)]
-
     overall_started = time.perf_counter()
+    tasks = [asyncio.create_task(worker(i)) for i in range(config.total_requests)]
     await asyncio.gather(*tasks)
     total_duration = time.perf_counter() - overall_started
 
